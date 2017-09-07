@@ -6,6 +6,11 @@
     The initial developer of the original code is Baohua Song
     <author@linuxdriver.cn>. All Rights Reserved.
 ======================================================================*/
+
+
+
+#include <linux/version.h>
+
 #include <linux/module.h>
 #include <linux/types.h>
 #include <linux/fs.h>
@@ -15,6 +20,13 @@
 #include <linux/init.h>
 #include <linux/cdev.h>
 #include <asm/io.h>
+
+//  error: implicit declaration of function `kfree`
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(3, 19, 0)
+#include <asm/system.h>
+#else
+#include <linux/slab.h>
+#endif
 //#include <asm/system.h>
 #include <asm/uaccess.h>
 
@@ -22,7 +34,7 @@
 #define MEM_CLEAR 0x1  /*清0全局内存*/
 #define GLOBALMEM_MAJOR 254    /*预设的globalmem的主设备号*/
 
-static globalmem_major = GLOBALMEM_MAJOR;
+static int globalmem_major = GLOBALMEM_MAJOR;
 /*globalmem设备结构体*/
 struct globalmem_dev
 {
@@ -47,6 +59,7 @@ int globalmem_release(struct inode *inode, struct file *filp)
   return 0;
 }
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 36)
 /* ioctl设备控制函数 */
 static int globalmem_ioctl(struct inode *inodep, struct file *filp, unsigned
   int cmd, unsigned long arg)
@@ -65,6 +78,7 @@ static int globalmem_ioctl(struct inode *inodep, struct file *filp, unsigned
   }
   return 0;
 }
+#endif
 
 /*读函数*/
 static ssize_t globalmem_read(struct file *filp, char __user *buf, size_t size,
@@ -174,7 +188,9 @@ static const struct file_operations globalmem_fops =
   .llseek = globalmem_llseek,
   .read = globalmem_read,
   .write = globalmem_write,
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 36)
   .ioctl = globalmem_ioctl,
+#endif
   .open = globalmem_open,
   .release = globalmem_release,
 };

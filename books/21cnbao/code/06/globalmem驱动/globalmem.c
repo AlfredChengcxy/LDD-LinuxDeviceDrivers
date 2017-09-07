@@ -28,45 +28,47 @@
 
 #include <asm/uaccess.h>
 
-#define GLOBALMEM_SIZE      0x1000            /*  È«¾ÖÄÚ´æ×î´ó4K×Ö½Ú          */
-#define MEM_CLEAR           0x1               /*  Çå0È«¾ÖÄÚ´æ                 */
-#define GLOBALMEM_MAJOR     300               /*  Ô¤ÉèµÄglobalmemµÄÖ÷Éè±¸ºÅ   */
+#define GLOBALMEM_SIZE      0x1000            /*  å…¨å±€å†…å­˜æœ€å¤§4Kå­—èŠ‚          */
+#define MEM_CLEAR           0x1               /*  æ¸…0å…¨å±€å†…å­˜                 */
+#define GLOBALMEM_MAJOR     300               /*  é¢„è®¾çš„globalmemçš„ä¸»è®¾å¤‡å·   */
 
 
-/*  globalmemµÄÉè±¸ºÅ   */
+/*  globalmemçš„è®¾å¤‡å·   */
 static int globalmem_major = GLOBALMEM_MAJOR;
 module_param(globalmem_major, int, S_IRUGO);
 
 
-/*  globalmemÉè±¸½á¹¹Ìå */
+/*  globalmemè®¾å¤‡ç»“æ„ä½“ */
 struct globalmem_dev
 {
 
-    struct cdev cdev;                         /*  cdev½á¹¹Ìå  */
-    unsigned char mem[GLOBALMEM_SIZE];        /*  È«¾ÖÄÚ´æ    */
+    struct cdev cdev;                         /*  cdevç»“æ„ä½“  */
+    unsigned char mem[GLOBALMEM_SIZE];        /*  å…¨å±€å†…å­˜    */
 
 };
 
-struct globalmem_dev *globalmem_devp;         /*  Éè±¸½á¹¹ÌåÖ¸Õë    */
+struct globalmem_dev *globalmem_devp;         /*  è®¾å¤‡ç»“æ„ä½“æŒ‡é’ˆ    */
 
 
-/*  ÎÄ¼ş´ò¿ªº¯Êı    */
+/*  æ–‡ä»¶æ‰“å¼€å‡½æ•°    */
 int globalmem_open(struct inode *inode, struct file *filp)
 {
-    /*    ½«Éè±¸½á¹¹ÌåÖ¸Õë¸³Öµ¸øÎÄ¼şË½ÓĞÊı¾İÖ¸Õë  */
+    /*    å°†è®¾å¤‡ç»“æ„ä½“æŒ‡é’ˆèµ‹å€¼ç»™æ–‡ä»¶ç§æœ‰æ•°æ®æŒ‡é’ˆ  */
+    printk(KERN_INFO "open \n");
     filp->private_data = globalmem_devp;
 
     return 0;
 }
 
-/*  ÎÄ¼şÊÍ·Åº¯Êı    */
+/*  æ–‡ä»¶é‡Šæ”¾å‡½æ•°    */
 int globalmem_release(struct inode *inode, struct file *filp)
 {
+    printk(KERN_INFO "release\n");
     return 0;
 }
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 36)
-/* ioctlÉè±¸¿ØÖÆº¯Êı */
+/* ioctlè®¾å¤‡æ§åˆ¶å‡½æ•° */
 static int globalmem_ioctl(
         struct inode *inodep,
         struct file *filp,
@@ -85,7 +87,7 @@ static long globalmem_compat_ioctl(
     struct inode *inode = inode = file_inode(filp);
 #endif
 
-    struct globalmem_dev *dev = filp->private_data;/*»ñµÃÉè±¸½á¹¹ÌåÖ¸Õë*/
+    struct globalmem_dev *dev = filp->private_data;/*è·å¾—è®¾å¤‡ç»“æ„ä½“æŒ‡é’ˆ*/
 
     switch (cmd)
     {
@@ -105,19 +107,20 @@ static long globalmem_compat_ioctl(
     return 0;
 }
 
-/*¶Áº¯Êı*/
+/*è¯»å‡½æ•°*/
 static ssize_t globalmem_read(
         struct file *filp,
         char __user *buf,
         size_t      size,
         loff_t      *ppos)
 {
-    unsigned long           p =  *ppos;                /*   ÎÄ¼şÖ¸ÕëÆ«ÒÆ once = 0, twice = GLOBALMEM_SIZE  */
+    unsigned long           p =  *ppos;                /*   æ–‡ä»¶æŒ‡é’ˆåç§» once = 0, twice = GLOBALMEM_SIZE  */
     unsigned int            count = size;              /*   GLOBALMEM_SIZE */
     int                     ret = 0;
-    struct globalmem_dev    *dev = filp->private_data; /*»ñµÃÉè±¸½á¹¹ÌåÖ¸Õë*/
+    struct globalmem_dev    *dev = filp->private_data; /*è·å¾—è®¾å¤‡ç»“æ„ä½“æŒ‡é’ˆ*/
 
-    /*  ·ÖÎöºÍ»ñÈ¡ÓĞĞ§µÄĞ´³¤¶È  */
+    /*  åˆ†æå’Œè·å–æœ‰æ•ˆçš„å†™é•¿åº¦  */
+    printk(KERN_INFO "read, before add ppos: %d\n", *ppos);
     if (p >= GLOBALMEM_SIZE)
     {
         printk("*ppos = %d\n", p);
@@ -127,11 +130,11 @@ static ssize_t globalmem_read(
          * http://blog.csdn.net/qiaoliang328/article/details/4874238
          * Fix bug when `cat /dev/ XXX`
          *
-         * return count ? 0 : -ENXIO;  Ìõ¼şÂú×ã·µ»Ø-ENXIO, ¼´No such device or address
+         * return count ? 0 : -ENXIO;  æ¡ä»¶æ»¡è¶³è¿”å›-ENXIO, å³No such device or address
          *
-         * Ê×ÏÈcatÃüÁîreadÉè±¸ÄÚÈİ, µ±·µ»ØÖµÊÇ´óÓÚ0µÄÊ±ºò,
-         * cat»á¼ÌĞøÔÚopenÉè±¸, È»ºó½øĞĞread²Ù×÷(Ã¿´Î¶Á4096×Ö½Ú)
-         * ³ÌĞòÀı×ÓÖĞµÚÒ»´Î
+         * é¦–å…ˆcatå‘½ä»¤readè®¾å¤‡å†…å®¹, å½“è¿”å›å€¼æ˜¯å¤§äº0çš„æ—¶å€™,
+         * catä¼šç»§ç»­åœ¨openè®¾å¤‡, ç„¶åè¿›è¡Œreadæ“ä½œ(æ¯æ¬¡è¯»4096å­—èŠ‚)
+         * ç¨‹åºä¾‹å­ä¸­ç¬¬ä¸€æ¬¡
          */
         return count ? -ENXIO : 0;
     }
@@ -141,9 +144,9 @@ static ssize_t globalmem_read(
         count = GLOBALMEM_SIZE - p;
     }
 
-    /*  ÄÚºË¿Õ¼ä->ÓÃ»§¿Õ¼ä
+    /*  å†…æ ¸ç©ºé—´->ç”¨æˆ·ç©ºé—´
      *
-     *  ½«dev->memÖĞÆ«ÒÆpÎªÆğÊ¼µÄÄÚ´æÇøÓòµÄÊı¾İ, ¿½±´count¸ö×Ö½Úµ½ÓÃ»§µÄbufÖĞ
+     *  å°†dev->memä¸­åç§»pä¸ºèµ·å§‹çš„å†…å­˜åŒºåŸŸçš„æ•°æ®, æ‹·è´countä¸ªå­—èŠ‚åˆ°ç”¨æˆ·çš„bufä¸­
      *  */
     if (copy_to_user(buf, (void*)(dev->mem + p), count))
     {
@@ -155,24 +158,25 @@ static ssize_t globalmem_read(
         ret = count;
 
         printk(KERN_INFO "read %d bytes(s) from %d\n", count, p);
+        printk(KERN_INFO "read, after add ppos: %d\n", *ppos);
     }
 
     return ret;
 }
 
-/*Ğ´º¯Êı*/
+/*å†™å‡½æ•°*/
 static ssize_t globalmem_write(
         struct file         *filp,
         const char __user   *buf,
-        size_t              size,
-        loff_t              *ppos)
+        size_t              size, loff_t              *ppos)
 {
     unsigned long p =  *ppos;
     unsigned int count = size;
     int ret = 0;
-    struct globalmem_dev *dev = filp->private_data; /*»ñµÃÉè±¸½á¹¹ÌåÖ¸Õë*/
+    struct globalmem_dev *dev = filp->private_data; /*è·å¾—è®¾å¤‡ç»“æ„ä½“æŒ‡é’ˆ*/
 
-    /*  ·ÖÎöºÍ»ñÈ¡ÓĞĞ§µÄĞ´³¤¶È  */
+    /*  åˆ†æå’Œè·å–æœ‰æ•ˆçš„å†™é•¿åº¦  */
+    printk(KERN_INFO "write, before add ppos: %d\n", *ppos);
     if (p >= GLOBALMEM_SIZE)
     {
         return count ?  - ENXIO: 0;
@@ -183,7 +187,7 @@ static ssize_t globalmem_write(
         count = GLOBALMEM_SIZE - p;
     }
 
-    /*  ÓÃ»§¿Õ¼ä->ÄÚºË¿Õ¼ä*/
+    /*  ç”¨æˆ·ç©ºé—´->å†…æ ¸ç©ºé—´*/
     if (copy_from_user(dev->mem + p, buf, count) != 0)
     {
         ret =  - EFAULT;
@@ -194,21 +198,24 @@ static ssize_t globalmem_write(
         ret = count;
 
         printk(KERN_INFO "written %d bytes(s) from %d\n", count, p);
+    	printk(KERN_INFO "write, after add ppos: %d\n", *ppos);
     }
 
     return ret;
 }
 
-/* seekÎÄ¼ş¶¨Î»º¯Êı */
+/* seekæ–‡ä»¶å®šä½å‡½æ•° */
 static loff_t globalmem_llseek(
         struct file *filp,
         loff_t      offset,
         int         orig)
 {
+
+    printk(KERN_INFO "llseek \n");
     loff_t ret = 0;
     switch (orig)
     {
-        case 0:   /*Ïà¶ÔÎÄ¼ş¿ªÊ¼Î»ÖÃÆ«ÒÆ*/
+        case 0:   /*ç›¸å¯¹æ–‡ä»¶å¼€å§‹ä½ç½®åç§»*/
             if (offset < 0)
             {
                 ret =  - EINVAL;
@@ -227,7 +234,7 @@ static loff_t globalmem_llseek(
 
             break;
 
-        case 1:   /*Ïà¶ÔÎÄ¼şµ±Ç°Î»ÖÃÆ«ÒÆ*/
+        case 1:   /*ç›¸å¯¹æ–‡ä»¶å½“å‰ä½ç½®åç§»*/
             if ((filp->f_pos + offset) > GLOBALMEM_SIZE)
             {
                 ret =  - EINVAL;
@@ -253,7 +260,7 @@ static loff_t globalmem_llseek(
     return ret;
 }
 
-/*ÎÄ¼ş²Ù×÷½á¹¹Ìå*/
+/*æ–‡ä»¶æ“ä½œç»“æ„ä½“*/
 static const struct file_operations globalmem_fops =
 {
     .owner = THIS_MODULE,
@@ -272,7 +279,7 @@ static const struct file_operations globalmem_fops =
     .release = globalmem_release,
 };
 
-/*³õÊ¼»¯²¢×¢²ácdev*/
+/*åˆå§‹åŒ–å¹¶æ³¨å†Œcdev*/
 static void globalmem_setup_cdev(struct globalmem_dev *dev, int index)
 {
     int err, devno = MKDEV(globalmem_major, index);
@@ -289,19 +296,19 @@ static void globalmem_setup_cdev(struct globalmem_dev *dev, int index)
     }
 }
 
-/*  Éè±¸Çı¶¯Ä£¿é¼ÓÔØº¯Êı    */
+/*  è®¾å¤‡é©±åŠ¨æ¨¡å—åŠ è½½å‡½æ•°    */
 int globalmem_init(void)
 {
     int result;
     dev_t devno = MKDEV(globalmem_major, 0);
 
-    /*  ÉêÇëÉè±¸ºÅ  */
+    /*  ç”³è¯·è®¾å¤‡å·  */
     if (globalmem_major != 0)
     {
         result = register_chrdev_region(devno, 1, "globalmem");
         printk(KERN_INFO "register char device drivers [globalmem], MAJOR = %d\n", globalmem_major);
     }
-    else  /* ¶¯Ì¬ÉêÇëÉè±¸ºÅ */
+    else  /* åŠ¨æ€ç”³è¯·è®¾å¤‡å· */
     {
         result = alloc_chrdev_region(&devno, 0, 1, "globalmem");
         globalmem_major = MAJOR(devno);
@@ -313,9 +320,9 @@ int globalmem_init(void)
         return result;
     }
 
-    /* ¶¯Ì¬ÉêÇëÉè±¸½á¹¹ÌåµÄÄÚ´æ*/
+    /* åŠ¨æ€ç”³è¯·è®¾å¤‡ç»“æ„ä½“çš„å†…å­˜*/
     globalmem_devp = kmalloc(sizeof(struct globalmem_dev), GFP_KERNEL);
-    if (!globalmem_devp)    /*  ÉêÇëÊ§°Ü    */
+    if (!globalmem_devp)    /*  ç”³è¯·å¤±è´¥    */
     {
         result =  - ENOMEM;
         unregister_chrdev_region(devno, 1);
@@ -329,14 +336,14 @@ int globalmem_init(void)
     return 0;
 }
 
-/*Ä£¿éĞ¶ÔØº¯Êı*/
+/*æ¨¡å—å¸è½½å‡½æ•°*/
 void globalmem_exit(void)
 {
-    cdev_del(&globalmem_devp->cdev);   /*×¢Ïúcdev*/
+    cdev_del(&globalmem_devp->cdev);   /*æ³¨é”€cdev*/
 
-    kfree(globalmem_devp);     /*ÊÍ·ÅÉè±¸½á¹¹ÌåÄÚ´æ*/
+    kfree(globalmem_devp);     /*é‡Šæ”¾è®¾å¤‡ç»“æ„ä½“å†…å­˜*/
 
-    unregister_chrdev_region(MKDEV(globalmem_major, 0), 1); /*ÊÍ·ÅÉè±¸ºÅ*/
+    unregister_chrdev_region(MKDEV(globalmem_major, 0), 1); /*é‡Šæ”¾è®¾å¤‡å·*/
 }
 
 
